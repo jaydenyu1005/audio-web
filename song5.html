@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>曲目5 · 高市</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="player">
+      <div class="cover">高</div>
+      <h2>曲目5</h2>
+      <p class="album">高市 · 专辑</p>
+
+      <!-- 隐藏的音频元素 -->
+      <audio id="audio" preload="metadata" src="audio/5.mp3"></audio>
+
+      <!-- 播放/暂停按钮 -->
+      <button id="playBtn" class="btn-play" aria-label="播放或暂停">▶</button>
+
+      <!-- 进度条 -->
+      <div class="progress-row">
+        <span id="current" class="time">0:00</span>
+        <input type="range" id="progress" class="progress" min="0" max="0" step="1" value="0">
+        <span id="total" class="time right">--:--</span>
+      </div>
+
+      <!-- 下载按钮 -->
+      <a class="btn-download" href="audio/5.mp3" download="曲目5.mp3">⬇ 下载</a>
+    </div>
+
+    <a class="back" href="index.html">← 返回曲目列表</a>
+    <footer class="footer">高市 · 在线音频专辑</footer>
+  </div>
+  <script src="js/player.js"></script>
+</body>
+</html>
