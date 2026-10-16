@@ -1,6 +1,7 @@
 /* ============================================================
    高市 · 播放器公共脚本  (song1.html ~ song6.html 共用)
-   功能：播放/暂停、进度条拖拽(含移动端)、当前时间/总时长显示
+   功能：播放/暂停、自定义进度条(含安卓触摸拖动)、时间显示
+   进度条为纯 div 实现，不依赖原生 range，安卓拖动稳定
    ============================================================ */
 (function () {
   var audio = document.getElementById('audio');
@@ -8,11 +9,13 @@
 
   var playBtn = document.getElementById('playBtn');
   var progress = document.getElementById('progress');
+  var progressFill = document.getElementById('progressFill');
+  var progressThumb = document.getElementById('progressThumb');
   var currentTime = document.getElementById('current');
   var totalTime = document.getElementById('total');
 
-  // 标记是否正在拖动进度条：拖动期间暂停由 timeupdate 复位滑块，避免拖不动/回弹
-  var scrubbing = false;
+  var duration = 0;      // 歌曲总时长（秒）
+  var scrubbing = false; // 是否正在拖动
 
   function fmt(s) {
     s = Math.floor(s || 0);
@@ -21,25 +24,34 @@
     return m + ':' + (sec < 10 ? '0' + sec : sec);
   }
 
-  // 元数据加载完成：设置进度条上限与总时长
+  // 根据当前播放时间刷新进度条位置
+  function updateBar() {
+    if (duration <= 0) return;
+    var pct = (audio.currentTime / duration) * 100;
+    pct = Math.max(0, Math.min(100, pct));
+    if (progressFill) progressFill.style.width = pct + '%';
+    if (progressThumb) progressThumb.style.left = pct + '%';
+  }
+
+  // 元数据加载完成：记录总时长
   audio.addEventListener('loadedmetadata', function () {
-    progress.max = Math.floor(audio.duration);
-    totalTime.textContent = fmt(audio.duration);
+    duration = audio.duration || 0;
+    totalTime.textContent = fmt(duration);
+    updateBar();
   });
 
-  // 播放中实时更新进度条与当前时间（拖动时只更新时间文字，不复位滑块）
+  // 播放中实时刷新（拖动期间不抢位置）
   audio.addEventListener('timeupdate', function () {
     currentTime.textContent = fmt(audio.currentTime);
-    if (!scrubbing) {
-      progress.value = Math.floor(audio.currentTime);
-    }
+    if (!scrubbing) updateBar();
   });
 
-  // 播放结束后复位
+  // 播放结束复位
   audio.addEventListener('ended', function () {
     playBtn.textContent = '▶';
-    progress.value = 0;
+    audio.currentTime = 0;
     currentTime.textContent = '0:00';
+    updateBar();
   });
 
   // 播放/暂停切换
@@ -53,26 +65,52 @@
     }
   });
 
-  function startScrub() { scrubbing = true; }
-
-  function endScrub() {
-    scrubbing = false;
-    audio.currentTime = progress.value;
-    currentTime.textContent = fmt(progress.value);
+  // 根据手指/鼠标横坐标跳转
+  function seekFromX(x) {
+    if (!progress) return;
+    var rect = progress.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    var ratio = (x - rect.left) / rect.width;
+    ratio = Math.max(0, Math.min(1, ratio));
+    if (duration > 0) {
+      audio.currentTime = ratio * duration;
+      currentTime.textContent = fmt(audio.currentTime);
+      updateBar();
+    } else {
+      // 尚未拿到时长，先只移动显示位置
+      if (progressFill) progressFill.style.width = (ratio * 100) + '%';
+      if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
+    }
   }
 
-  // 拖动进度条跳转（边拖边实时跳转，抬起后定格）
-  progress.addEventListener('input', function () {
-    currentTime.textContent = fmt(progress.value);
-    audio.currentTime = progress.value;
+  // ---- 指针事件（安卓/桌面统一） ----
+  progress.addEventListener('pointerdown', function (e) {
+    scrubbing = true;
+    if (progress.setPointerCapture) {
+      try { progress.setPointerCapture(e.pointerId); } catch (err) {}
+    }
+    seekFromX(e.clientX);
+  });
+  progress.addEventListener('pointermove', function (e) {
+    if (scrubbing) seekFromX(e.clientX);
+  });
+  progress.addEventListener('pointerup', function (e) {
+    scrubbing = false;
+    seekFromX(e.clientX);
+  });
+  progress.addEventListener('pointercancel', function () {
+    scrubbing = false;
   });
 
-  // 指针事件：桌面鼠标 + 移动端触摸统一处理
-  progress.addEventListener('pointerdown', startScrub);
-  progress.addEventListener('pointerup', endScrub);
-  progress.addEventListener('pointercancel', endScrub);
-
-  // 兼容旧版移动端浏览器
-  progress.addEventListener('touchstart', startScrub, { passive: true });
-  progress.addEventListener('touchend', endScrub, { passive: true });
+  // ---- 兼容旧版安卓 WebView 的触摸事件 ----
+  progress.addEventListener('touchstart', function (e) {
+    scrubbing = true;
+    if (e.touches && e.touches[0]) seekFromX(e.touches[0].clientX);
+  }, { passive: true });
+  progress.addEventListener('touchmove', function (e) {
+    if (scrubbing && e.touches && e.touches[0]) seekFromX(e.touches[0].clientX);
+  }, { passive: true });
+  progress.addEventListener('touchend', function () {
+    scrubbing = false;
+  }, { passive: true });
 })();

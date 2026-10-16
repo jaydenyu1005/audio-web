@@ -128,34 +128,46 @@ body {
 .btn-play:hover { transform: scale(1.06); box-shadow: 0 10px 28px rgba(240, 150, 40, 0.6); }
 .btn-play:active { transform: scale(0.97); }
 
-/* 进度条 */
+/* 进度条（纯自定义，兼容安卓触摸拖动） */
 .progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .time { font-size: 12px; color: var(--text-dim); min-width: 42px; }
 .time.right { text-align: right; }
 
-input[type="range"].progress {
-  -webkit-appearance: none;
-  appearance: none;
+.progress-custom {
+  position: relative;
   flex: 1;
+  height: 18px;          /* 加高触摸热区，便于手指按住 */
+  cursor: pointer;
+  touch-action: none;    /* 触摸时视为拖动，不触发页面滚动 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.progress-custom::before {          /* 轨道 */
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
   height: 6px;
+  transform: translateY(-50%);
   border-radius: 3px;
   background: rgba(255, 255, 255, 0.16);
-  outline: none;
-  cursor: pointer;
-  touch-action: none;   /* 移动端：触摸滑块视为拖动，不触发页面滚动 */
 }
-input[type="range"].progress::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px; height: 18px;
+.progress-fill {                    /* 已播放部分 */
+  position: absolute;
+  left: 0; top: 50%;
+  height: 6px;
+  transform: translateY(-50%);
+  width: 0%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.progress-thumb {                   /* 圆点 */
+  position: absolute;
+  left: 0%; top: 50%;
+  width: 16px; height: 16px;
+  transform: translate(-50%, -50%);
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px rgba(240, 180, 59, 0.6);
-}
-input[type="range"].progress::-moz-range-thumb {
-  width: 18px; height: 18px;
-  border: none; border-radius: 50%;
-  background: var(--accent);
 }
 
 /* 下载按钮 */
