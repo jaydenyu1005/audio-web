@@ -1,7 +1,8 @@
 /* ============================================================
    高市 · 播放器公共脚本  (song1.html ~ song6.html 共用)
    功能：播放/暂停、自定义进度条(含安卓触摸拖动)、时间显示
-   进度条为纯 div 实现，不依赖原生 range，安卓拖动稳定
+   关键：拖动过程中只更新UI动画，松手后才真正跳转音频一次，
+   避免在安卓上边拖边反复 seek 导致音频无响应。
    ============================================================ */
 (function () {
   var audio = document.getElementById('audio');
@@ -65,21 +66,31 @@
     }
   });
 
-  // 根据手指/鼠标横坐标跳转
-  function seekFromX(x) {
-    if (!progress) return;
+  // 计算某个横坐标对应的百分比(0~1)
+  function ratioFromX(x) {
+    if (!progress) return 0;
     var rect = progress.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    var ratio = (x - rect.left) / rect.width;
-    ratio = Math.max(0, Math.min(1, ratio));
+    if (rect.width <= 0) return 0;
+    var r = (x - rect.left) / rect.width;
+    return Math.max(0, Math.min(1, r));
+  }
+
+  // 仅移动 UI 动画（拖动过程中用，不碰音频）
+  function moveBarUI(ratio) {
+    if (progressFill) progressFill.style.width = (ratio * 100) + '%';
+    if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
+    if (duration > 0) {
+      currentTime.textContent = fmt(ratio * duration);
+    }
+  }
+
+  // 真正跳转音频（点击 / 松手时调用）
+  function seekAudio(x) {
+    var ratio = ratioFromX(x);
+    moveBarUI(ratio);
     if (duration > 0) {
       audio.currentTime = ratio * duration;
       currentTime.textContent = fmt(audio.currentTime);
-      updateBar();
-    } else {
-      // 尚未拿到时长，先只移动显示位置
-      if (progressFill) progressFill.style.width = (ratio * 100) + '%';
-      if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
     }
   }
 
@@ -89,28 +100,31 @@
     if (progress.setPointerCapture) {
       try { progress.setPointerCapture(e.pointerId); } catch (err) {}
     }
-    seekFromX(e.clientX);
+    seekAudio(e.clientX);            // 点一下就立刻跳
   });
   progress.addEventListener('pointermove', function (e) {
-    if (scrubbing) seekFromX(e.clientX);
+    if (scrubbing) moveBarUI(ratioFromX(e.clientX));  // 拖动：只动动画
   });
   progress.addEventListener('pointerup', function (e) {
     scrubbing = false;
-    seekFromX(e.clientX);
+    seekAudio(e.clientX);            // 松手：真正跳转一次
   });
   progress.addEventListener('pointercancel', function () {
     scrubbing = false;
+    updateBar();
   });
 
   // ---- 兼容旧版安卓 WebView 的触摸事件 ----
   progress.addEventListener('touchstart', function (e) {
     scrubbing = true;
-    if (e.touches && e.touches[0]) seekFromX(e.touches[0].clientX);
+    if (e.touches && e.touches[0]) seekAudio(e.touches[0].clientX);
   }, { passive: true });
   progress.addEventListener('touchmove', function (e) {
-    if (scrubbing && e.touches && e.touches[0]) seekFromX(e.touches[0].clientX);
+    if (scrubbing && e.touches && e.touches[0]) moveBarUI(ratioFromX(e.touches[0].clientX));
   }, { passive: true });
-  progress.addEventListener('touchend', function () {
+  progress.addEventListener('touchend', function (e) {
     scrubbing = false;
+    var x = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : null;
+    if (x !== null) seekAudio(x);
   }, { passive: true });
 })();
