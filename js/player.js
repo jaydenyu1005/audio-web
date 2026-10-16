@@ -130,18 +130,46 @@
     updateBar();
   });
 
-  // ---- 兼容旧版安卓 WebView 的触摸事件 ----
+  // ---- 触摸事件：非被动 + preventDefault，兼容安卓/微信/QQ/UC等不支持Pointer的浏览器 ----
+  // 注意：必须非被动才能阻止浏览器把滑动当作页面滚动（旧安卓浏览器没有touch-action支持）
   progress.addEventListener('touchstart', function (e) {
+    if (e.cancelable) e.preventDefault();
     scrubbing = true;
     cacheBarRect();
     if (e.touches && e.touches[0]) seekAudio(e.touches[0].clientX);
-  }, { passive: true });
+  }, { passive: false });
   progress.addEventListener('touchmove', function (e) {
-    if (scrubbing && e.touches && e.touches[0]) moveBarUI(ratioFromX(e.touches[0].clientX));
-  }, { passive: true });
+    if (!scrubbing) return;
+    if (e.cancelable) e.preventDefault();
+    if (e.touches && e.touches[0]) moveBarUI(ratioFromX(e.touches[0].clientX));
+  }, { passive: false });
   progress.addEventListener('touchend', function (e) {
+    if (e.cancelable) e.preventDefault();
     scrubbing = false;
     var x = (e.changedTouches && e.changedTouches[0]) ? e.changedTouches[0].clientX : null;
     if (x !== null) seekAudio(x);
-  }, { passive: true });
+  }, { passive: false });
+  progress.addEventListener('touchcancel', function () {
+    scrubbing = false;
+    updateBar();
+  }, { passive: false });
+
+  // ---- 鼠标事件兜底（仅当浏览器不支持 Pointer 事件时启用，避免重复处理） ----
+  if (!window.PointerEvent) {
+    var mouseDown = false;
+    progress.addEventListener('mousedown', function (e) {
+      mouseDown = true;
+      cacheBarRect();
+      seekAudio(e.clientX);
+    });
+    progress.addEventListener('mousemove', function (e) {
+      if (mouseDown) moveBarUI(ratioFromX(e.clientX));
+    });
+    progress.addEventListener('mouseup', function (e) {
+      if (mouseDown) {
+        mouseDown = false;
+        seekAudio(e.clientX);
+      }
+    });
+  }
 })();
