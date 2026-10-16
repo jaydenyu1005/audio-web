@@ -3,13 +3,53 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>祝高诚璐大美女生日快乐</title>
-  <link rel="stylesheet" href="css/style.css?v=3">
+  <title>唱片本</title>
+  <link rel="stylesheet" href="css/style.css?v=5">
 </head>
 <body>
-  <div class="wrap">
+
+  <!-- ============ 屏幕一：选择题（进主页先看到这个） ============ -->
+  <div id="screen-question" class="overlay show">
+    <div class="quiz-card">
+      <!-- 题目文字：在这里填写你的问题 -->
+      <p class="quiz-question" id="quizQuestion">请问你是高诚璐吗？</p>
+
+      <div class="quiz-buttons">
+        <!-- 左侧：绿色按钮（文字留空，自己改） -->
+        <button id="btnGreen" class="quiz-btn btn-green">是！</button>
+        <!-- 右侧：红色按钮（文字留空，自己改） -->
+        <button id="btnRed" class="quiz-btn btn-red">不是。</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 屏幕二：贺卡（点绿色按钮后进入） ============ -->
+  <div id="screen-card" class="overlay">
+    <div class="paper-wrap">
+      <!-- 右上角：小叉（点它进主界面） -->
+      <button id="btnCloseCard" class="close-x" aria-label="关闭">✕</button>
+      <!-- 一张纸：纸上的段落在这里自己写 -->
+      <div class="paper">
+        <div class="paper-content" id="cardContent">To:高诚璐
+          祝你十三岁生日快乐，已经成为了一位Teenager。
+          在新的一年里，希望你能好好学习，争取进步。早日逃脱陈嘉树、马勍天和我这样的人的嘲笑，让全班对你刮目相看。
+          我特意为你准备了这份“唱片本”的生日礼物，里面的歌曲都是我精心挑选的。希望你在以后可以听到更多你喜爱的音乐，遇见更多你喜爱的明星。
+          新一岁，继续闪闪发光，年年都有新惊喜。
+          ————于皓洋
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 屏幕三：退出提示（点红键后，若浏览器不允许真正关闭） ============ -->
+  <div id="screen-exit" class="overlay">
+    <p class="exit-message">页面已关闭</p>
+  </div>
+
+  <!-- ============ 屏幕四：主界面（曲目列表） ============ -->
+  <div id="screen-main" class="wrap">
     <header class="header">
-      <h1>祝高诚璐大美女生日快乐</h1>
+      <h1>唱片本</h1>
       <p class="sub">HAPPY BIRTHDAY!</p>
     </header>
 
@@ -23,7 +63,35 @@
       <li><a href="song6.html"><span class="num">6</span><div class="meta"><div class="name">唯一</div><div class="duration">4:14</div></div><span class="play-arrow">▶</span></a></li>
     </ul>
 
-    <footer class="footer">在线音频专辑</footer>
+    <footer class="footer">Just for Cindy Gao.</footer>
   </div>
+
+  <script>
+    // 切换屏幕的辅助函数
+    function show(id) {
+      ['screen-question', 'screen-card', 'screen-exit', 'screen-main'].forEach(function (s) {
+        var el = document.getElementById(s);
+        if (el) el.classList.remove('show');
+      });
+      var target = document.getElementById(id);
+      if (target) target.classList.add('show');
+    }
+
+    // 绿色按钮 → 进入贺卡界面
+    document.getElementById('btnGreen').addEventListener('click', function () {
+      show('screen-card');
+    });
+
+    // 红色按钮 → 退出页面（多数浏览器不允许脚本直接关闭，会走下面的退出提示）
+    document.getElementById('btnRed').addEventListener('click', function () {
+      window.close();
+      show('screen-exit');
+    });
+
+    // 贺卡右上角小叉 → 进入主界面
+    document.getElementById('btnCloseCard').addEventListener('click', function () {
+      show('screen-main');
+    });
+  </script>
 </body>
 </html>

@@ -184,3 +184,105 @@ input[type="range"].progress::-moz-range-thumb {
 .back:hover { color: var(--accent); }
 
 .footer { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 28px; opacity: 0.7; }
+
+/* ============================================================
+   进门流程：选择题 / 贺卡纸 / 退出提示（index.html 使用）
+   ============================================================ */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.92);
+}
+.overlay.show { display: flex; }
+
+/* 屏幕一：选择题 */
+.quiz-card {
+  max-width: 380px;
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 22px;
+  padding: 36px 26px;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+.quiz-question {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--text);
+  min-height: 60px;      /* 留出题目填写高度 */
+  margin-bottom: 26px;
+  word-break: break-word;
+}
+.quiz-buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.quiz-btn {
+  flex: 1;
+  max-width: 150px;
+  min-width: 96px;
+  height: 56px;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s, box-shadow 0.2s, filter 0.2s;
+}
+.quiz-btn:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.quiz-btn:active { transform: scale(0.96); }
+.btn-green { background: #2ecc71; box-shadow: 0 6px 18px rgba(46, 204, 113, 0.4); }
+.btn-red   { background: #e74c3c; box-shadow: 0 6px 18px rgba(231, 76, 60, 0.4); }
+
+/* 屏幕二：贺卡纸 */
+.paper-wrap {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+}
+.close-x {
+  position: absolute;
+  top: -14px; right: -6px;
+  width: 30px; height: 30px;
+  border: none; border-radius: 50%;
+  background: var(--accent);
+  color: #1a1405;
+  font-size: 15px; font-weight: 700;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  transition: transform 0.12s;
+}
+.close-x:hover { transform: scale(1.1); }
+.paper {
+  background: #fdfbf3;               /* 纸色 */
+  color: #3a3326;
+  border-radius: 12px;
+  padding: 40px 30px 36px;
+  min-height: 320px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  font-size: 16px;
+  line-height: 1.9;
+}
+.paper-content {
+  white-space: pre-wrap;            /* 段落可换行 */
+  word-break: break-word;
+  min-height: 200px;
+}
+
+/* 屏幕三：退出提示（红键按下后，若浏览器不允许真正关闭页面） */
+.exit-message {
+  color: var(--text-dim);
+  font-size: 16px;
+  letter-spacing: 1px;
+}
