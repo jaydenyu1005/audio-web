@@ -1,8 +1,9 @@
 /* ============================================================
    高市 · 播放器公共脚本  (song1.html ~ song6.html 共用)
    功能：播放/暂停、自定义进度条(含安卓触摸拖动)、时间显示
-   关键：拖动过程中只更新UI动画，松手后才真正跳转音频一次，
-   避免在安卓上边拖边反复 seek 导致音频无响应。
+   关键：
+   1) 拖动时只更新UI动画，松手后才真正跳转音频一次；
+   2) 缓存进度条尺寸 + requestAnimationFrame 按帧更新，减少安卓卡顿。
    ============================================================ */
 (function () {
   var audio = document.getElementById('audio');
@@ -15,8 +16,10 @@
   var currentTime = document.getElementById('current');
   var totalTime = document.getElementById('total');
 
-  var duration = 0;      // 歌曲总时长（秒）
-  var scrubbing = false; // 是否正在拖动
+  var duration = 0;       // 歌曲总时长（秒）
+  var scrubbing = false;  // 是否正在拖动
+  var barLeft = 0, barWidth = 0;  // 缓存的进度条几何位置
+  var rafPending = false; // 是否已有待执行的动画帧
 
   function fmt(s) {
     s = Math.floor(s || 0);
@@ -25,7 +28,7 @@
     return m + ':' + (sec < 10 ? '0' + sec : sec);
   }
 
-  // 根据当前播放时间刷新进度条位置
+  // 刷新进度条显示（无动画帧批处理版，供时间更新用）
   function updateBar() {
     if (duration <= 0) return;
     var pct = (audio.currentTime / duration) * 100;
@@ -33,6 +36,15 @@
     if (progressFill) progressFill.style.width = pct + '%';
     if (progressThumb) progressThumb.style.left = pct + '%';
   }
+
+  // 缓存进度条的位置与宽度（拖动开始和窗口变化时刷新）
+  function cacheBarRect() {
+    if (!progress) return;
+    var rect = progress.getBoundingClientRect();
+    barLeft = rect.left;
+    barWidth = rect.width;
+  }
+  window.addEventListener('resize', cacheBarRect);
 
   // 元数据加载完成：记录总时长
   audio.addEventListener('loadedmetadata', function () {
@@ -66,22 +78,25 @@
     }
   });
 
-  // 计算某个横坐标对应的百分比(0~1)
+  // 根据缓存的几何位置计算横坐标对应的百分比(0~1)
   function ratioFromX(x) {
-    if (!progress) return 0;
-    var rect = progress.getBoundingClientRect();
-    if (rect.width <= 0) return 0;
-    var r = (x - rect.left) / rect.width;
+    if (barWidth <= 0) return 0;
+    var r = (x - barLeft) / barWidth;
     return Math.max(0, Math.min(1, r));
   }
 
-  // 仅移动 UI 动画（拖动过程中用，不碰音频）
+  // 移动UI动画（按帧批处理，减少安卓卡顿）
   function moveBarUI(ratio) {
-    if (progressFill) progressFill.style.width = (ratio * 100) + '%';
-    if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
-    if (duration > 0) {
-      currentTime.textContent = fmt(ratio * duration);
-    }
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function () {
+      rafPending = false;
+      if (progressFill) progressFill.style.width = (ratio * 100) + '%';
+      if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
+      if (duration > 0) {
+        currentTime.textContent = fmt(ratio * duration);
+      }
+    });
   }
 
   // 真正跳转音频（点击 / 松手时调用）
@@ -97,6 +112,7 @@
   // ---- 指针事件（安卓/桌面统一） ----
   progress.addEventListener('pointerdown', function (e) {
     scrubbing = true;
+    cacheBarRect();
     if (progress.setPointerCapture) {
       try { progress.setPointerCapture(e.pointerId); } catch (err) {}
     }
@@ -117,6 +133,7 @@
   // ---- 兼容旧版安卓 WebView 的触摸事件 ----
   progress.addEventListener('touchstart', function (e) {
     scrubbing = true;
+    cacheBarRect();
     if (e.touches && e.touches[0]) seekAudio(e.touches[0].clientX);
   }, { passive: true });
   progress.addEventListener('touchmove', function (e) {
