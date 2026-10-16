@@ -142,17 +142,18 @@ input[type="range"].progress {
   background: rgba(255, 255, 255, 0.16);
   outline: none;
   cursor: pointer;
+  touch-action: none;   /* 移动端：触摸滑块视为拖动，不触发页面滚动 */
 }
 input[type="range"].progress::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px; height: 14px;
+  width: 18px; height: 18px;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 8px rgba(240, 180, 59, 0.6);
 }
 input[type="range"].progress::-moz-range-thumb {
-  width: 14px; height: 14px;
+  width: 18px; height: 18px;
   border: none; border-radius: 50%;
   background: var(--accent);
 }
