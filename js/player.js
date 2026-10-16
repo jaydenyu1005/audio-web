@@ -1,9 +1,11 @@
 /* ============================================================
    高市 · 播放器公共脚本  (song1.html ~ song6.html 共用)
    功能：播放/暂停、自定义进度条(含安卓触摸拖动)、时间显示
-   关键：
-   1) 拖动时只更新UI动画，松手后才真正跳转音频一次；
-   2) 缓存进度条尺寸 + requestAnimationFrame 按帧更新，减少安卓卡顿。
+   关键点：
+   1) 拖动时只更新UI动画，松手后跳转音频一次；
+   2) 若音频时长尚未就绪，先记录目标位置，时长就绪后自动补跳，
+      解决安卓上"滑块能拖但声音不动"的问题；
+   3) 兼容 Pointer / Touch / Mouse 三种输入。
    ============================================================ */
 (function () {
   var audio = document.getElementById('audio');
@@ -16,28 +18,34 @@
   var currentTime = document.getElementById('current');
   var totalTime = document.getElementById('total');
 
-  var duration = 0;       // 歌曲总时长（秒）
-  var scrubbing = false;  // 是否正在拖动
-  var barLeft = 0, barWidth = 0;  // 缓存的进度条几何位置
-  var rafPending = false; // 是否已有待执行的动画帧
+  var duration = 0;        // 有效总时长（秒）
+  var scrubbing = false;   // 是否正在拖动
+  var pendingRatio = -1;   // 时长未就绪时暂存的目标比例
+  var barLeft = 0, barWidth = 0;
+  var rafPending = false;
 
   function fmt(s) {
-    s = Math.floor(s || 0);
+    if (!isFinite(s) || s < 0) return '0:00';
+    s = Math.floor(s);
     var m = Math.floor(s / 60);
     var sec = s % 60;
     return m + ':' + (sec < 10 ? '0' + sec : sec);
   }
 
-  // 刷新进度条显示（无动画帧批处理版，供时间更新用）
+  // 返回有效的有限时长；异常(0/NaN/Infinity)返回 0
+  function goodDuration() {
+    return (isFinite(duration) && duration > 0) ? duration : 0;
+  }
+
   function updateBar() {
-    if (duration <= 0) return;
-    var pct = (audio.currentTime / duration) * 100;
+    var d = goodDuration();
+    if (d <= 0) return;
+    var pct = (audio.currentTime / d) * 100;
     pct = Math.max(0, Math.min(100, pct));
     if (progressFill) progressFill.style.width = pct + '%';
     if (progressThumb) progressThumb.style.left = pct + '%';
   }
 
-  // 缓存进度条的位置与宽度（拖动开始和窗口变化时刷新）
   function cacheBarRect() {
     if (!progress) return;
     var rect = progress.getBoundingClientRect();
@@ -46,12 +54,30 @@
   }
   window.addEventListener('resize', cacheBarRect);
 
-  // 元数据加载完成：记录总时长
-  audio.addEventListener('loadedmetadata', function () {
-    duration = audio.duration || 0;
-    totalTime.textContent = fmt(duration);
+  // 时长更新：loadedmetadata / durationchange 都处理
+  function onDuration() {
+    var d = audio.duration;
+    if (isFinite(d) && d > 0) {
+      duration = d;
+      totalTime.textContent = fmt(d);
+    }
     updateBar();
-  });
+    applyPendingSeek();
+  }
+  audio.addEventListener('loadedmetadata', onDuration);
+  audio.addEventListener('durationchange', onDuration);
+
+  // 若时长已就绪且有未完成的跳转，则补跳
+  function applyPendingSeek() {
+    var d = goodDuration();
+    if (pendingRatio >= 0 && d > 0) {
+      var target = pendingRatio * d;
+      pendingRatio = -1;
+      try { audio.currentTime = Math.min(target, d); } catch (err) {}
+      currentTime.textContent = fmt(audio.currentTime);
+      updateBar();
+    }
+  }
 
   // 播放中实时刷新（拖动期间不抢位置）
   audio.addEventListener('timeupdate', function () {
@@ -59,7 +85,6 @@
     if (!scrubbing) updateBar();
   });
 
-  // 播放结束复位
   audio.addEventListener('ended', function () {
     playBtn.textContent = '▶';
     audio.currentTime = 0;
@@ -67,7 +92,6 @@
     updateBar();
   });
 
-  // 播放/暂停切换
   playBtn.addEventListener('click', function () {
     if (audio.paused) {
       audio.play();
@@ -78,14 +102,12 @@
     }
   });
 
-  // 根据缓存的几何位置计算横坐标对应的百分比(0~1)
   function ratioFromX(x) {
     if (barWidth <= 0) return 0;
     var r = (x - barLeft) / barWidth;
     return Math.max(0, Math.min(1, r));
   }
 
-  // 移动UI动画（按帧批处理，减少安卓卡顿）
   function moveBarUI(ratio) {
     if (rafPending) return;
     rafPending = true;
@@ -93,45 +115,48 @@
       rafPending = false;
       if (progressFill) progressFill.style.width = (ratio * 100) + '%';
       if (progressThumb) progressThumb.style.left = (ratio * 100) + '%';
-      if (duration > 0) {
-        currentTime.textContent = fmt(ratio * duration);
-      }
+      var d = goodDuration();
+      if (d > 0) currentTime.textContent = fmt(ratio * d);
     });
   }
 
-  // 真正跳转音频（点击 / 松手时调用）
+  // 真正跳转音频：时长就绪则立即跳，否则暂存待时长就绪后补跳
   function seekAudio(x) {
     var ratio = ratioFromX(x);
     moveBarUI(ratio);
-    if (duration > 0) {
-      audio.currentTime = ratio * duration;
+    var d = goodDuration();
+    if (d > 0) {
+      pendingRatio = -1;
+      try { audio.currentTime = Math.min(ratio * d, d); } catch (err) {}
       currentTime.textContent = fmt(audio.currentTime);
+      updateBar();
+    } else {
+      pendingRatio = ratio;   // 时长未就绪，记录目标
     }
   }
 
-  // ---- 指针事件（安卓/桌面统一） ----
+  // ---- 指针事件 ----
   progress.addEventListener('pointerdown', function (e) {
     scrubbing = true;
     cacheBarRect();
     if (progress.setPointerCapture) {
       try { progress.setPointerCapture(e.pointerId); } catch (err) {}
     }
-    seekAudio(e.clientX);            // 点一下就立刻跳
+    seekAudio(e.clientX);
   });
   progress.addEventListener('pointermove', function (e) {
-    if (scrubbing) moveBarUI(ratioFromX(e.clientX));  // 拖动：只动动画
+    if (scrubbing) moveBarUI(ratioFromX(e.clientX));
   });
   progress.addEventListener('pointerup', function (e) {
     scrubbing = false;
-    seekAudio(e.clientX);            // 松手：真正跳转一次
+    seekAudio(e.clientX);
   });
   progress.addEventListener('pointercancel', function () {
     scrubbing = false;
     updateBar();
   });
 
-  // ---- 触摸事件：非被动 + preventDefault，兼容安卓/微信/QQ/UC等不支持Pointer的浏览器 ----
-  // 注意：必须非被动才能阻止浏览器把滑动当作页面滚动（旧安卓浏览器没有touch-action支持）
+  // ---- 触摸事件：非被动 + preventDefault ----
   progress.addEventListener('touchstart', function (e) {
     if (e.cancelable) e.preventDefault();
     scrubbing = true;
@@ -154,7 +179,7 @@
     updateBar();
   }, { passive: false });
 
-  // ---- 鼠标事件兜底（仅当浏览器不支持 Pointer 事件时启用，避免重复处理） ----
+  // ---- 鼠标兜底（不支持 Pointer 的浏览器） ----
   if (!window.PointerEvent) {
     var mouseDown = false;
     progress.addEventListener('mousedown', function (e) {
